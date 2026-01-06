@@ -1,0 +1,5 @@
+{
+  "name": "ResumeAI - Multi-Agent Screener",
+  "description": "A high-concurrency recruitment tool that employs 5 parallel AI agents to screen hundreds of resumes against job descriptions using Google Gemini.",
+  "requestFramePermissions": []
+}
