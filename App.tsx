@@ -52,9 +52,19 @@ function App() {
 
       try {
         const base64 = await fileToBase64(fileItem.file);
-        // Default to pdf mime type for robustness in this demo environment, unless it's explicitly docx
+        
+        // Determine MIME type with fallbacks for Word documents
         let mimeType = fileItem.file.type;
-        if (!mimeType) mimeType = "application/pdf"; // Fallback
+        const lowerName = fileItem.file.name.toLowerCase();
+        
+        if (!mimeType || mimeType === '') {
+          if (lowerName.endsWith('.pdf')) mimeType = 'application/pdf';
+          else if (lowerName.endsWith('.docx')) mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          else if (lowerName.endsWith('.doc')) mimeType = 'application/msword';
+        }
+        
+        // Final fallback
+        if (!mimeType) mimeType = "application/pdf"; 
         
         // ARTIFICIAL DELAY to simulate "Reading" and avoid rate limits on Free Tier
         await new Promise(r => setTimeout(r, 1500)); 

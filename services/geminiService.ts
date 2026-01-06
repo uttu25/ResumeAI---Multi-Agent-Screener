@@ -31,46 +31,40 @@ export const analyzeResume = async (
     }
     
     const ai = new GoogleGenAI({ apiKey: effectiveKey });
-    // Use the stable gemini-2.0-flash model to ensure reliability. 
-    const modelId = "gemini-2.0-flash"; 
+    
+    // UPDATED: Using Gemini 3.0 Flash as requested for best performance and stability.
+    const modelId = "gemini-3-flash-preview"; 
 
     const prompt = `
-      You are a Strict Recruitment Officer. Your job is to enforce requirements without exception.
-      
+      You are an Evidence-Based Recruitment Auditor. 
+      Your ONLY goal is to verify if specific keywords from the Job Description (JD) exist in the Resume.
+
       JOB DESCRIPTION (JD):
       ${jobDescription}
 
-      INSTRUCTIONS:
-      
-      STEP 1: ANALYZE THE JD
-      - Extract a list of **MANDATORY** requirements. 
-        - RULE: Any educational degree (MBA, PhD, Bachelors, etc.) mentioned is AUTOMATICALLY MANDATORY unless the JD explicitly says "preferred" or "optional" next to it.
-        - RULE: Keywords like "Must have", "Required", "Essential", "Core" indicate Mandatory.
-      - Extract a list of **OPTIONAL** requirements (Nice to have, Preferred, Bonus).
+      ---------------------------------------------------------
 
-      STEP 2: ANALYZE THE RESUME
-      - Cross-reference the resume against the lists from Step 1.
+      CRITICAL INSTRUCTION FOR MANDATORY SKILLS:
+      1. Identify all MANDATORY requirements in the JD (especially Degrees like MBA, PhD, Bachelor, and "Must Have" skills).
+      2. SCAN the Resume for these exact keywords or their standard abbreviations.
+         - Example: If JD asks for "MBA", you MUST accept "M.B.A.", "Master of Business Administration", "Masters in Business", or "MBA".
+         - Example: If JD asks for "Python", you MUST accept "Python".
+      3. IF the keyword or its synonym exists in the resume, it is FOUND. Do not over-analyze the context (e.g. if they have the degree, they match, regardless of year).
 
-      STEP 3: CALCULATE STATUS AND SCORE
-      
-      **LOGIC FOR MATCH STATUS (Pass/Fail):**
-      - If the resume is missing EVEN ONE Mandatory requirement (especially the Degree):
-        -> matchStatus = FALSE
-        -> matchScore MUST be between 0 and 49.
-      - If the resume has ALL Mandatory requirements:
-        -> matchStatus = TRUE
-        -> matchScore MUST be at least 70.
+      SCORING LOGIC (STRICT):
+      - **FAIL (Score 0-49)**: If ANY Mandatory Requirement is completely MISSING from the text.
+        - matchStatus: false
+      - **PASS (Score 70-100)**: If ALL Mandatory Requirements are present.
+        - matchStatus: true
+        - Base Score: 70.
+        - Add points (up to 100) for every OPTIONAL skill found.
 
-      **LOGIC FOR RANKING (70-100):**
-      - Only if matchStatus is TRUE, use Optional skills to increase the score.
-      - Base Score = 70 (Met all mandatory).
-      - Add points for every Optional skill found up to 100.
-      
-      **AI DETECTION:**
-      - Analyze the writing style for robotic patterns, lack of nuance, or ChatGPT-style sentence structures.
+      ---------------------------------------------------------
 
-      OUTPUT FORMAT:
-      Return pure JSON adhering to the defined schema.
+      OUTPUT:
+      Return a JSON object matching the schema. 
+      - If you reject (matchStatus: false), 'reason' MUST specify exactly which mandatory keyword was missing.
+      - If you accept (matchStatus: true), 'reason' should summarize why they fit.
     `;
 
     const response = await ai.models.generateContent({
@@ -89,7 +83,7 @@ export const analyzeResume = async (
       config: {
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,
-        temperature: 0.0, // Set to 0.0 for maximum determinism
+        temperature: 0.0, // Zero temperature for deterministic keyword matching
       }
     });
 

@@ -41,7 +41,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ files, setFiles, isProcessing }
           type="file"
           id="resume-upload"
           multiple
-          accept=".pdf,.docx"
+          accept=".pdf,.doc,.docx"
           onChange={handleFileChange}
           className="hidden"
           disabled={isProcessing}
@@ -52,7 +52,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ files, setFiles, isProcessing }
           </div>
           <div>
             <p className="text-lg font-medium text-white">Click to upload resumes</p>
-            <p className="text-slate-400 text-sm mt-1">Supports PDF & Word (Max 500 files)</p>
+            <p className="text-slate-400 text-sm mt-1">Supports PDF, DOC & DOCX (Max 500 files)</p>
           </div>
         </label>
       </div>
