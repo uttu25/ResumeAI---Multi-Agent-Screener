@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie 
 } from 'recharts';
 import { FileWithId } from '../types';
-import { CheckCircle, XCircle, User, Award, AlertTriangle, FileText } from 'lucide-react';
+import { CheckCircle, XCircle, User, Award, AlertTriangle, FileText, Bot } from 'lucide-react';
 
 interface ResultsDashboardProps {
   files: FileWithId[];
@@ -23,7 +23,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ files }) => {
     const total = processedFiles.length;
     const qualified = qualifiedCandidates.length;
     const rejected = total - qualified;
-    return { total, qualified, rejected };
+    const aiDetected = processedFiles.filter(f => f.result?.isAiGenerated).length;
+    return { total, qualified, rejected, aiDetected };
   }, [processedFiles, qualifiedCandidates]);
 
   const scoreDistribution = useMemo(() => {
@@ -44,7 +45,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ files }) => {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       
       {/* Top Level Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex items-center justify-between">
           <div>
             <p className="text-slate-400 text-sm font-medium">Total Processed</p>
@@ -72,6 +73,15 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ files }) => {
           </div>
           <div className="p-3 bg-red-500/10 rounded-lg">
             <XCircle className="w-6 h-6 text-red-500" />
+          </div>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex items-center justify-between">
+          <div>
+            <p className="text-slate-400 text-sm font-medium">AI Detected</p>
+            <p className="text-3xl font-bold text-purple-400 mt-1">{stats.aiDetected}</p>
+          </div>
+          <div className="p-3 bg-purple-500/10 rounded-lg">
+            <Bot className="w-6 h-6 text-purple-500" />
           </div>
         </div>
       </div>
@@ -164,7 +174,20 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ files }) => {
                         <User className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="font-medium text-slate-200">{file.result?.candidateName}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-200">{file.result?.candidateName}</p>
+                          {file.result?.isAiGenerated && (
+                            <div className="group/ai relative">
+                              <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] font-bold uppercase rounded border border-purple-500/30 flex items-center gap-1 cursor-help">
+                                <Bot className="w-3 h-3" />
+                                AI
+                              </span>
+                              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-48 bg-slate-900 border border-slate-700 text-slate-300 text-xs p-2 rounded shadow-xl opacity-0 group-hover/ai:opacity-100 transition-opacity pointer-events-none z-50">
+                                {file.result?.aiGenerationReasoning}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500 truncate w-32">{file.file.name}</p>
                       </div>
                     </div>

@@ -13,6 +13,8 @@ export interface AnalysisResult {
   mandatorySkillsFound: string[];
   mandatorySkillsMissing: string[];
   optionalSkillsFound: string[];
+  isAiGenerated: boolean;
+  aiGenerationReasoning: string;
 }
 
 export interface AgentState {
