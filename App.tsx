@@ -1,16 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Layers, Rocket, PlayCircle, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Layers, Rocket, PlayCircle, RefreshCw, Settings, LogOut, User as UserIcon } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import JobDescriptionInput from './components/JobDescriptionInput';
 import AgentStatus from './components/AgentStatus';
 import ResultsDashboard from './components/ResultsDashboard';
-import { FileWithId, AgentState } from './types';
+import LoginScreen from './components/LoginScreen';
+import SettingsModal from './components/SettingsModal';
+import { FileWithId, AgentState, UserProfile } from './types';
 import { distributeFiles, fileToBase64 } from './utils/helpers';
 import { analyzeResume } from './services/geminiService';
 
 const AGENT_NAMES = ["Agent Alpha", "Agent Beta", "Agent Gamma", "Agent Delta", "Agent Epsilon"];
 
 function App() {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
   const [files, setFiles] = useState<FileWithId[]>([]);
   const [jdText, setJdText] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -116,9 +121,27 @@ function App() {
     })));
   };
 
+  const handleLogout = () => {
+    setUser(null);
+    setFiles([]);
+    setJdText('');
+  };
+
+  if (!user) {
+    return <LoginScreen onLogin={setUser} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 pb-20">
       
+      {/* Settings Modal */}
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        user={user}
+        onUpdateUser={setUser}
+      />
+
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -126,23 +149,56 @@ function App() {
             <div className="bg-primary-600 p-2 rounded-lg shadow-lg shadow-primary-500/20">
               <Layers className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-white">
+            <h1 className="text-xl font-bold tracking-tight text-white hidden md:block">
               ResumeAI <span className="text-slate-500 font-normal">Multi-Agent Screener</span>
             </h1>
           </div>
+          
           <div className="flex items-center gap-4">
              {files.length > 0 && (
-                <div className="px-3 py-1 bg-slate-900 rounded-full border border-slate-700 text-xs font-mono text-slate-400">
+                <div className="px-3 py-1 bg-slate-900 rounded-full border border-slate-700 text-xs font-mono text-slate-400 hidden sm:block">
                   {files.length} Applicants
                 </div>
              )}
-            <button 
-              onClick={reset}
-              disabled={isProcessing}
-              className="text-slate-400 hover:text-white transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </button>
+            
+            <div className="h-6 w-px bg-slate-800 mx-1"></div>
+
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={reset}
+                disabled={isProcessing}
+                className="text-slate-400 hover:text-white transition-colors disabled:opacity-50 p-2 hover:bg-slate-900 rounded-lg"
+                title="Reset All"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+
+              <div className="relative group">
+                <button 
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors p-1 pr-3 rounded-full hover:bg-slate-900 border border-transparent hover:border-slate-800"
+                >
+                  <div className="w-8 h-8 rounded-full bg-slate-800 overflow-hidden border border-slate-700">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <UserIcon className="w-4 h-4 text-slate-500" />
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-sm font-medium hidden sm:block">{user.name}</span>
+                </button>
+              </div>
+
+              <button 
+                onClick={handleLogout}
+                className="text-slate-400 hover:text-red-400 transition-colors p-2 hover:bg-slate-900 rounded-lg"
+                title="Sign Out"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </header>

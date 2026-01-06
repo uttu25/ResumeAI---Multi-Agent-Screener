@@ -34,3 +34,11 @@ export interface JobDescription {
   mandatorySkills: string[];
   optionalSkills: string[];
 }
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  apiKey?: string;
+}
