@@ -59,7 +59,8 @@ function App() {
         // ARTIFICIAL DELAY to simulate "Reading" and avoid rate limits on Free Tier
         await new Promise(r => setTimeout(r, 1500)); 
 
-        const result = await analyzeResume(base64, mimeType, jdText);
+        // Pass the user's API key if available
+        const result = await analyzeResume(base64, mimeType, jdText, user?.apiKey);
 
         setFiles(prev => prev.map(f => 
           f.id === fileItem.id ? { ...f, status: 'completed', result } : f
@@ -89,8 +90,13 @@ function App() {
   };
 
   const startAnalysis = async () => {
-    if (files.length === 0 || !jdText.trim()) {
-      alert("Please upload resumes and provide a Job Description.");
+    if (files.length === 0) {
+      alert("Please upload at least one resume.");
+      return;
+    }
+
+    if (!jdText.trim()) {
+      alert("Please enter a Job Description.");
       return;
     }
 
@@ -223,7 +229,7 @@ function App() {
           {!isProcessing ? (
              <button
               onClick={startAnalysis}
-              disabled={files.length === 0 || !jdText}
+              disabled={files.length === 0}
               className="group relative inline-flex items-center gap-3 px-8 py-4 bg-primary-600 hover:bg-primary-500 text-white font-bold rounded-full transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
               <Rocket className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
