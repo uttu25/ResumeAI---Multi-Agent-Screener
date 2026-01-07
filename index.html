@@ -10,25 +10,17 @@
         theme: {
           extend: {
             colors: {
-              slate: {
-                850: '#151f32',
-                900: '#0f172a',
-                950: '#020617',
-              },
-              primary: {
-                500: '#3b82f6',
-                600: '#2563eb',
-              }
+              slate: { 850: '#151f32', 900: '#0f172a', 950: '#020617' },
+              primary: { 500: '#3b82f6', 600: '#2563eb' }
             },
-            animation: {
-              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            }
+            animation: { 'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite' }
           },
         },
       }
     </script>
-</head>
+  </head>
   <body class="bg-slate-950 text-slate-100 antialiased selection:bg-primary-500/30">
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
