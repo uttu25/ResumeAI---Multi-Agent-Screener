@@ -65,11 +65,11 @@ export const analyzeResume = async (
 
       **STEP 3: Scoring & Decision Logic**
       - **Pass/Fail Rule (matchStatus):** - Candidate FAILS if they miss the Degree OR any Critical Mandatory Skill.
-         - Candidate PASSES if they have the Degree AND most Mandatory Skills.
+         - Candidate PASSES if they have the Degree AND All Mandatory Skills.
          - *Special Case:* If JD has NO mandatory skills (only Degree), then Degree = Pass.
 
       - **Scoring Rule (matchScore):**
-         - **Base Score:** 70 points for meeting Mandatory requirements.
+         - **Base Score:** 70 points for meeting All Mandatory requirements.
          - **Bonus Points:** Add 5 points for every "Optional Skill" found (up to 100 max).
          - *Example:* A candidate with MBA + 3 Bonus Skills gets higher score than candidate with just MBA.
 
