@@ -30,7 +30,7 @@ export const analyzeResume = async (
     
     const ai = new GoogleGenAI({ apiKey: effectiveKey });
     
-    // UPDATED: Switched to 'gemini-1.5-pro' for maximum intelligence
+    // Using 'gemini-1.5-pro' for maximum intelligence
     const modelId = "gemini-1.5-pro"; 
 
     const prompt = `
@@ -56,3 +56,89 @@ export const analyzeResume = async (
     `;
 
     // Retry Logic for Rate Limits (429 Errors)
+    const makeRequestWithRetry = async (retries = 3, delay = 2000): Promise<any> => {
+      try {
+        let contentsParts: any[] = [{ text: prompt }];
+
+        if (isPlainText) {
+           contentsParts.push({ text: `RESUME TEXT CONTENT:\n${fileContent}` });
+        } else {
+           contentsParts.push({
+             inlineData: { mimeType: mimeType, data: fileContent }
+           });
+        }
+
+        return await ai.models.generateContent({
+          model: modelId,
+          contents: { parts: contentsParts },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: RESPONSE_SCHEMA,
+            temperature: 0.1, 
+          }
+        });
+      } catch (error: any) {
+        if (retries > 0 && (error.message?.includes("429") || error.message?.includes("quota"))) {
+          console.warn(`Rate limit hit. Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return makeRequestWithRetry(retries - 1, delay * 2);
+        }
+        throw error;
+      }
+    };
+
+    const response = await makeRequestWithRetry();
+    const text = response.text();
+    if (!text) throw new Error("No response text from AI model");
+
+    return JSON.parse(text) as AnalysisResult;
+
+  } catch (error: any) {
+    console.error("Gemini Analysis Error:", error.message);
+    return {
+      candidateName: "Error Processing File",
+      matchStatus: false,
+      matchScore: 0,
+      reason: `API Error: ${error.message || "Unknown error"}.`,
+      mandatorySkillsFound: [],
+      mandatorySkillsMissing: [],
+      optionalSkillsFound: [],
+      isAiGenerated: false,
+      aiGenerationReasoning: "Processing failed."
+    };
+  }
+};
+
+// --- CHAT FEATURE ---
+export const startChatWithResume = async (
+  fileContent: string,
+  mimeType: string,
+  isPlainText: boolean,
+  apiKey?: string
+) => {
+  const effectiveKey = apiKey || process.env.API_KEY;
+  if (!effectiveKey) throw new Error("No API Key provided.");
+
+  const ai = new GoogleGenAI({ apiKey: effectiveKey });
+  // Using Flash for chat as it is faster and sufficient for Q&A
+  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  const initialParts: any[] = [
+    { text: "You are an expert Recruitment Assistant. I will provide you with a candidate's resume. Your job is to answer my specific questions about their experience, skills, and red flags based ONLY on this document. Be concise and professional." }
+  ];
+
+  if (isPlainText) {
+    initialParts.push({ text: `RESUME TEXT CONTENT:\n${fileContent}` });
+  } else {
+    initialParts.push({ inlineData: { mimeType, data: fileContent } });
+  }
+
+  const chat = model.startChat({
+    history: [
+      { role: "user", parts: initialParts },
+      { role: "model", parts: [{ text: "Understood. I have read the resume. Ask me anything about this candidate." }] }
+    ]
+  });
+
+  return chat;
+};
