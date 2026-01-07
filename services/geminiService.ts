@@ -18,92 +18,81 @@ const RESPONSE_SCHEMA: Schema = {
 };
 
 export const analyzeResume = async (
-  base64Data: string,
-  mimeType: string,
-  jobDescription: string,
-  apiKey?: string
+  fileContent: string, 
+  mimeType: string, 
+  jobDescription: string, 
+  apiKey?: string,
+  isPlainText: boolean = false
 ): Promise<AnalysisResult> => {
   try {
-    // Dynamically initialize client to support user-provided keys
     const effectiveKey = apiKey || process.env.API_KEY;
-    if (!effectiveKey) {
-      throw new Error("No API Key provided. Please configure it in settings or environment.");
-    }
+    if (!effectiveKey) throw new Error("No API Key provided.");
     
     const ai = new GoogleGenAI({ apiKey: effectiveKey });
-    
-    // UPDATED: Using Gemini 3.0 Flash as requested for best performance and stability.
-    const modelId = "gemini-3-flash-preview"; 
+    const modelId = "gemini-1.5-flash"; // Switched to stable model
 
     const prompt = `
       You are an Evidence-Based Recruitment Auditor. 
       Your ONLY goal is to verify if specific keywords from the Job Description (JD) exist in the Resume.
-
+      
       JOB DESCRIPTION (JD):
       ${jobDescription}
-
+      
       ---------------------------------------------------------
-
-      CRITICAL INSTRUCTION FOR MANDATORY SKILLS:
-      1. Identify all MANDATORY requirements in the JD (especially Degrees like MBA, PhD, Bachelor, and "Must Have" skills).
-      2. SCAN the Resume for these exact keywords or their standard abbreviations.
-         - Example: If JD asks for "MBA", you MUST accept "M.B.A.", "Master of Business Administration", "Masters in Business", or "MBA".
-         - Example: If JD asks for "Python", you MUST accept "Python".
-      3. IF the keyword or its synonym exists in the resume, it is FOUND. Do not over-analyze the context (e.g. if they have the degree, they match, regardless of year).
-
-      SCORING LOGIC (STRICT):
-      - **FAIL (Score 0-49)**: If ANY Mandatory Requirement is completely MISSING from the text.
-        - matchStatus: false
-      - **PASS (Score 70-100)**: If ALL Mandatory Requirements are present.
-        - matchStatus: true
-        - Base Score: 70.
-        - Add points (up to 100) for every OPTIONAL skill found.
-
+      CRITICAL INSTRUCTION:
+      1. Identify MANDATORY requirements (Degrees, "Must Have" skills).
+      2. SCAN the Resume for these exact keywords.
+      3. Return a JSON object strictly matching the schema.
       ---------------------------------------------------------
-
-      OUTPUT:
-      Return a JSON object matching the schema. 
-      - If you reject (matchStatus: false), 'reason' MUST specify exactly which mandatory keyword was missing.
-      - If you accept (matchStatus: true), 'reason' should summarize why they fit.
     `;
 
-    const response = await ai.models.generateContent({
-      model: modelId,
-      contents: {
-        parts: [
-          { text: prompt },
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Data
-            }
-          }
-        ]
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-        temperature: 0.0, // Zero temperature for deterministic keyword matching
-      }
-    });
+    // Retry Logic for Rate Limits (429 Errors)
+    const makeRequestWithRetry = async (retries = 3, delay = 2000): Promise<any> => {
+      try {
+        let contentsParts = [{ text: prompt }];
 
-    const text = response.text;
+        if (isPlainText) {
+           // Inject extracted text directly into the prompt
+           contentsParts.push({ text: `RESUME TEXT CONTENT:\n${fileContent}` });
+        } else {
+           // Use standard vision/document mode
+           contentsParts.push({
+             inlineData: { mimeType: mimeType, data: fileContent }
+           });
+        }
+
+        return await ai.models.generateContent({
+          model: modelId,
+          contents: { parts: contentsParts },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: RESPONSE_SCHEMA,
+            temperature: 0.0,
+          }
+        });
+      } catch (error: any) {
+        if (retries > 0 && (error.message?.includes("429") || error.message?.includes("quota"))) {
+          console.warn(`Rate limit hit. Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return makeRequestWithRetry(retries - 1, delay * 2);
+        }
+        throw error;
+      }
+    };
+
+    const response = await makeRequestWithRetry();
+    const text = response.text();
     if (!text) throw new Error("No response text from AI model");
 
     return JSON.parse(text) as AnalysisResult;
 
   } catch (error: any) {
-    // SECURITY: Only log the message, never the full error object which might contain the API key config
-    console.error("Gemini Analysis Error:", error.message || "Unknown error occurred");
-    
-    const errorMessage = error.message || "Unknown API Error";
-
-    // Return a fallback error result so the batch processing continues
+    console.error("Gemini Analysis Error:", error.message);
     return {
       candidateName: "Error Processing File",
       matchStatus: false,
       matchScore: 0,
-      reason: `API Error: ${errorMessage}.`,
+      reason: `API Error: ${error.message || "Unknown error"}.`,
       mandatorySkillsFound: [],
       mandatorySkillsMissing: [],
       optionalSkillsFound: [],
