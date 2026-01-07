@@ -14,7 +14,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const API_URL = "/api";
+  // UPDATED: Relative path for API
+  const API_URL = "/api"; 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
