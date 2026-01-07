@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie 
 } from 'recharts';
 import { FileWithId } from '../types';
-import { CheckCircle, XCircle, User, Award, AlertTriangle, FileText, Bot } from 'lucide-react';
+import { CheckCircle, XCircle, User, Award, AlertTriangle, FileText, Bot, Download } from 'lucide-react';
 
 interface ResultsDashboardProps {
   files: FileWithId[];
@@ -38,6 +38,56 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ files }) => {
     });
     return Object.keys(buckets).map(key => ({ name: key, count: buckets[key as keyof typeof buckets] }));
   }, [processedFiles]);
+
+  // --- NEW FEATURE: EXPORT TO CSV ---
+  const downloadCSV = () => {
+    if (processedFiles.length === 0) return;
+
+    // 1. Define Headers
+    const headers = [
+      "Candidate Name",
+      "Match Score",
+      "Status",
+      "Mandatory Skills Found",
+      "Missing Skills",
+      "AI Generated?",
+      "Reasoning"
+    ];
+
+    // 2. Format Rows
+    const rows = processedFiles.map(f => {
+      const r = f.result;
+      if (!r) return "";
+      
+      // Escape quotes for CSV format to avoid breaking columns
+      const safeReason = `"${r.reason.replace(/"/g, '""')}"`;
+      const safeMissing = `"${r.mandatorySkillsMissing.join(', ')}"`;
+      const safeFound = `"${r.mandatorySkillsFound.join(', ')}"`;
+
+      return [
+        `"${r.candidateName}"`,
+        r.matchScore,
+        r.matchStatus ? "Qualified" : "Rejected",
+        safeFound,
+        safeMissing,
+        r.isAiGenerated ? "Yes" : "No",
+        safeReason
+      ].join(",");
+    });
+
+    // 3. Create File
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // 4. Trigger Download
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `resume_screening_report_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   if (processedFiles.length === 0) return null;
 
@@ -146,12 +196,26 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ files }) => {
         </div>
       </div>
 
-      {/* Consolidated List */}
+      {/* Consolidated List with CSV Export */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
         <div className="p-6 border-b border-slate-800 flex justify-between items-center">
           <h3 className="text-lg font-semibold text-white">Top Candidates (Consolidated)</h3>
-          <span className="text-xs font-mono text-slate-500 bg-slate-800 px-2 py-1 rounded">Sorted by Match Score</span>
+          
+          <div className="flex items-center gap-3">
+             <span className="text-xs font-mono text-slate-500 bg-slate-800 px-2 py-1 rounded hidden sm:inline-block">Sorted by Match Score</span>
+             
+             {/* NEW DOWNLOAD BUTTON */}
+             <button 
+               onClick={downloadCSV}
+               className="flex items-center gap-2 px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-xs font-bold rounded transition-colors shadow-lg shadow-primary-500/20"
+               title="Export Results to Excel/CSV"
+             >
+               <Download className="w-4 h-4" />
+               Export CSV
+             </button>
+          </div>
         </div>
+        
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
