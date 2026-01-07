@@ -66,8 +66,8 @@ function App() {
         // Final fallback
         if (!mimeType) mimeType = "application/pdf"; 
         
-        // ARTIFICIAL DELAY to simulate "Reading" and avoid rate limits on Free Tier
-        await new Promise(r => setTimeout(r, 1500)); 
+        // Reduced delay to 500ms (from 1500ms) to make bulk processing faster while still preventing instant rate-limit hits
+        await new Promise(r => setTimeout(r, 500)); 
 
         // Pass the user's API key if available
         const result = await analyzeResume(base64, mimeType, jdText, user?.apiKey);

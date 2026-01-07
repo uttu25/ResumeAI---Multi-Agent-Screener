@@ -93,9 +93,9 @@ export const analyzeResume = async (
     return JSON.parse(text) as AnalysisResult;
 
   } catch (error: any) {
-    console.error("Gemini Analysis Error:", error);
+    // SECURITY: Only log the message, never the full error object which might contain the API key config
+    console.error("Gemini Analysis Error:", error.message || "Unknown error occurred");
     
-    // Extract more specific error message if available
     const errorMessage = error.message || "Unknown API Error";
 
     // Return a fallback error result so the batch processing continues
@@ -103,7 +103,7 @@ export const analyzeResume = async (
       candidateName: "Error Processing File",
       matchStatus: false,
       matchScore: 0,
-      reason: `API Error: ${errorMessage}. Please check your API key and quota.`,
+      reason: `API Error: ${errorMessage}.`,
       mandatorySkillsFound: [],
       mandatorySkillsMissing: [],
       optionalSkillsFound: [],

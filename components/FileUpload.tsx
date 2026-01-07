@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, FileText, AlertCircle, FolderUp } from 'lucide-react';
+import { Upload, FileText, AlertCircle, FolderUp, Trash2 } from 'lucide-react';
 import { FileWithId } from '../types';
 import { generateId } from '../utils/helpers';
 
@@ -12,6 +12,7 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({ files, setFiles, isProcessing }) => {
   const [isDragging, setIsDragging] = useState(false);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFiles = (fileList: FileList | null) => {
     if (fileList && fileList.length > 0) {
@@ -59,6 +60,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ files, setFiles, isProcessing }
     folderInputRef.current?.click();
   };
 
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
   const removeFile = (id: string) => {
     if (isProcessing) return;
     setFiles(prev => prev.filter(f => f.id !== id));
@@ -74,20 +79,21 @@ const FileUpload: React.FC<FileUploadProps> = ({ files, setFiles, isProcessing }
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-white flex items-center gap-2">
           <Upload className="w-5 h-5 text-primary-500" />
-          Resume Upload
+          Bulk Upload
         </h2>
         {files.length > 0 && !isProcessing && (
           <button 
             onClick={clearAll}
-            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors bg-red-500/10 px-2 py-1 rounded border border-red-500/20"
           >
-            Clear All
+            <Trash2 className="w-3 h-3" />
+            Clear Queue
           </button>
         )}
       </div>
 
       <div 
-        className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 flex flex-col items-center justify-center gap-4 flex-grow
+        className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 flex flex-col items-center justify-center gap-4 flex-grow
           ${isProcessing ? 'opacity-50 cursor-not-allowed border-slate-700' : ''}
           ${isDragging ? 'border-primary-500 bg-primary-500/10 scale-[0.99]' : 'border-slate-700 hover:border-primary-500 hover:bg-slate-800/50'}
         `}
@@ -97,14 +103,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ files, setFiles, isProcessing }
       >
         <input
           type="file"
-          id="resume-upload"
+          ref={fileInputRef}
           multiple
           accept=".pdf,.doc,.docx"
           onChange={handleFileChange}
           className="hidden"
           disabled={isProcessing}
         />
-        {/* Hidden Input for Folder Upload */}
+        {/* Hidden Input for Folder Upload - using ref to trigger */}
         <input
           type="file"
           ref={folderInputRef}
@@ -121,31 +127,26 @@ const FileUpload: React.FC<FileUploadProps> = ({ files, setFiles, isProcessing }
         </div>
         
         <div className="space-y-1">
-          <label 
-            htmlFor="resume-upload" 
-            className={`block text-lg font-medium text-white ${isProcessing ? 'pointer-events-none' : 'cursor-pointer hover:text-primary-400 transition-colors'}`}
-          >
-            Drag & Drop or <span className="underline decoration-primary-500 underline-offset-4">Click to Browse</span>
-          </label>
-          <p className="text-slate-400 text-sm">Supports PDF, DOC & DOCX</p>
+          <h3 className="text-lg font-medium text-white">Drag & Drop Resumes</h3>
+          <p className="text-slate-400 text-sm">PDF, DOC, DOCX supported</p>
         </div>
 
         {!isProcessing && (
-          <div className="flex items-center gap-3 mt-2">
-            <span className="h-px w-12 bg-slate-700"></span>
-            <span className="text-xs text-slate-500 uppercase font-medium">OR</span>
-            <span className="h-px w-12 bg-slate-700"></span>
+          <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full max-w-xs">
+            <button
+              onClick={triggerFileUpload}
+              className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg border border-slate-600 transition-colors"
+            >
+              Select Files
+            </button>
+            <button
+              onClick={triggerFolderUpload}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white text-sm font-bold rounded-lg shadow-lg shadow-primary-500/20 transition-all"
+            >
+              <FolderUp className="w-4 h-4" />
+              Upload Folder
+            </button>
           </div>
-        )}
-
-        {!isProcessing && (
-          <button
-            onClick={triggerFolderUpload}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg border border-slate-700 transition-colors"
-          >
-            <FolderUp className="w-4 h-4" />
-            Upload Folder
-          </button>
         )}
       </div>
 
@@ -157,7 +158,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ files, setFiles, isProcessing }
              <span className="text-xs text-slate-500">Max 500 files</span>
           </div>
           
-          <div className="max-h-48 overflow-y-auto pr-2 custom-scrollbar space-y-2">
+          <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-2">
             {files.map((item) => (
               <div key={item.id} className="flex items-center justify-between bg-slate-800 p-2.5 rounded-md border border-slate-700 group">
                 <div className="flex items-center gap-3 overflow-hidden">
@@ -177,7 +178,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ files, setFiles, isProcessing }
                       onClick={() => removeFile(item.id)} 
                       className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1"
                     >
-                      <AlertCircle className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
