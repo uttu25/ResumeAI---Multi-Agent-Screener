@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json({ limit: '50mb' })); // Increased limit for resume data
+app.use(bodyParser.json({ limit: '50mb' }));
 
 // Initialize Database
 const db = new sqlite3.Database('./users.db', (err) => {
@@ -23,7 +23,7 @@ const db = new sqlite3.Database('./users.db', (err) => {
   else console.log("Connected to SQLite database.");
 });
 
-// 1. Create Users Table
+// Users Table
 db.run(`CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT,
@@ -31,7 +31,7 @@ db.run(`CREATE TABLE IF NOT EXISTS users (
   password TEXT
 )`);
 
-// 2. Create Scans Table (History)
+// Scans Table (History)
 db.run(`CREATE TABLE IF NOT EXISTS scans (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER,
@@ -45,7 +45,6 @@ db.run(`CREATE TABLE IF NOT EXISTS scans (
 
 // --- API ROUTES ---
 
-// Register
 app.post('/api/register', (req, res) => {
   const { name, email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Missing fields" });
@@ -53,13 +52,12 @@ app.post('/api/register', (req, res) => {
   db.run(`INSERT INTO users (name, email, password) VALUES (?, ?, ?)`, 
     [name, email, hashedPassword], 
     function(err) {
-      if (err) return res.status(400).json({ error: "User already exists or error occurred." });
+      if (err) return res.status(400).json({ error: "User already exists." });
       res.json({ id: this.lastID, name, email });
     }
   );
 });
 
-// Login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
@@ -69,15 +67,11 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-// Save Scan to History
 app.post('/api/save-scan', (req, res) => {
   const { userId, title, jobDescription, results, stats } = req.body;
   const date = new Date().toISOString();
-  const resultsJson = JSON.stringify(results);
-  const statsJson = JSON.stringify(stats);
-
   db.run(`INSERT INTO scans (user_id, title, date, job_description, results, stats) VALUES (?, ?, ?, ?, ?, ?)`,
-    [userId, title, date, jobDescription, resultsJson, statsJson],
+    [userId, title, date, jobDescription, JSON.stringify(results), JSON.stringify(stats)],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true, scanId: this.lastID });
@@ -85,7 +79,6 @@ app.post('/api/save-scan', (req, res) => {
   );
 });
 
-// Get History List
 app.get('/api/history/:userId', (req, res) => {
   const { userId } = req.params;
   db.all(`SELECT id, title, date, stats FROM scans WHERE user_id = ? ORDER BY date DESC`, [userId], (err, rows) => {
@@ -95,7 +88,6 @@ app.get('/api/history/:userId', (req, res) => {
   });
 });
 
-// Get Specific Scan Details
 app.get('/api/scan/:scanId', (req, res) => {
   const { scanId } = req.params;
   db.get(`SELECT * FROM scans WHERE id = ?`, [scanId], (err, row) => {
@@ -104,16 +96,13 @@ app.get('/api/scan/:scanId', (req, res) => {
   });
 });
 
-// --- DEPLOYMENT: SERVE FRONTEND ---
-// This tells the server to serve the React files from the 'dist' folder
+// --- SERVE FRONTEND (Crucial for Render) ---
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Handle React routing (Redirect any unknown route to index.html)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Start Server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
