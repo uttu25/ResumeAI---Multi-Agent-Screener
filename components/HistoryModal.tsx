@@ -28,7 +28,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, userId, on
   const fetchHistory = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/history/${userId}`);
+      const res = await fetch(`/api/history/${userId}`); // UPDATED: Relative path
       const data = await res.json();
       setHistory(data);
     } catch (err) {
