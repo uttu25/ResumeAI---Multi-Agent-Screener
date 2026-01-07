@@ -267,8 +267,8 @@ function App() {
           )}
         </div>
 
-        {/* Results Section */}
-        <ResultsDashboard files={files} />
+        {/* Results Section - UPDATED HERE */}
+        <ResultsDashboard files={files} user={user} />
         
       </main>
     </div>
