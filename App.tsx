@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Layers, Rocket, PlayCircle, RefreshCw, Settings, LogOut, User as UserIcon } from 'lucide-react';
+import mammoth from 'mammoth'; // Import for Word Doc extraction
 import FileUpload from './components/FileUpload';
 import JobDescriptionInput from './components/JobDescriptionInput';
 import AgentStatus from './components/AgentStatus';
@@ -51,26 +52,39 @@ function App() {
       setFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'processing' } : f));
 
       try {
-        const base64 = await fileToBase64(fileItem.file);
-        
-        // Determine MIME type with fallbacks for Word documents
-        let mimeType = fileItem.file.type;
-        const lowerName = fileItem.file.name.toLowerCase();
-        
-        if (!mimeType || mimeType === '') {
-          if (lowerName.endsWith('.pdf')) mimeType = 'application/pdf';
-          else if (lowerName.endsWith('.docx')) mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-          else if (lowerName.endsWith('.doc')) mimeType = 'application/msword';
+        let finalContent = "";
+        let finalMime = "";
+        let isText = false;
+
+        // 1. Check for Word Document (.docx) to extract text
+        if (fileItem.file.name.toLowerCase().endsWith('.docx')) {
+           const arrayBuffer = await fileItem.file.arrayBuffer();
+           const result = await mammoth.extractRawText({ arrayBuffer });
+           finalContent = result.value; // Extracted plain text
+           finalMime = "text/plain";
+           isText = true;
+        } 
+        // 2. Standard PDF / Image Handling
+        else {
+           finalContent = await fileToBase64(fileItem.file);
+           
+           // Determine MIME
+           let mimeType = fileItem.file.type;
+           const lowerName = fileItem.file.name.toLowerCase();
+           if (!mimeType || mimeType === '') {
+              if (lowerName.endsWith('.pdf')) mimeType = 'application/pdf';
+              else mimeType = 'application/pdf'; // Default fallback
+           }
+           finalMime = mimeType;
+           isText = false;
         }
         
-        // Final fallback
-        if (!mimeType) mimeType = "application/pdf"; 
-        
-        // Reduced delay to 500ms (from 1500ms) to make bulk processing faster while still preventing instant rate-limit hits
-        await new Promise(r => setTimeout(r, 500)); 
+        // 3. Rate Limit Protection (Wait 1s between calls per agent)
+        await new Promise(r => setTimeout(r, 1000)); 
 
-        // Pass the user's API key if available
-        const result = await analyzeResume(base64, mimeType, jdText, user?.apiKey);
+        // 4. Call API with new isPlainText flag
+        // Note: You must have updated geminiService.ts as well!
+        const result = await analyzeResume(finalContent, finalMime, jdText, user?.apiKey, isText);
 
         setFiles(prev => prev.map(f => 
           f.id === fileItem.id ? { ...f, status: 'completed', result } : f
