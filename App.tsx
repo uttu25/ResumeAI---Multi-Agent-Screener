@@ -131,7 +131,7 @@ function App() {
     };
 
     try {
-      const res = await fetch('http://localhost:5000/api/save-scan', {
+      const res = await fetch('/api/save-scan', { // UPDATED: Relative path
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -150,7 +150,7 @@ function App() {
 
   const handleLoadScan = async (scanId: number) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/scan/${scanId}`);
+      const res = await fetch(`/api/scan/${scanId}`); // UPDATED: Relative path
       const data = await res.json();
       
       setJdText(data.job_description);
