@@ -101,3 +101,45 @@ export const analyzeResume = async (
     };
   }
 };
+// ... existing code ...
+
+// --- NEW CHAT FEATURE ---
+export const startChatWithResume = async (
+  fileContent: string,
+  mimeType: string,
+  isPlainText: boolean,
+  apiKey?: string
+) => {
+  const effectiveKey = apiKey || process.env.API_KEY;
+  if (!effectiveKey) throw new Error("No API Key provided.");
+
+  const ai = new GoogleGenAI({ apiKey: effectiveKey });
+  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  // Prepare the initial context
+  const initialParts: any[] = [
+    { text: "You are an expert Recruitment Assistant. I will provide you with a candidate's resume. Your job is to answer my specific questions about their experience, skills, and red flags based ONLY on this document. Be concise and professional." }
+  ];
+
+  if (isPlainText) {
+    initialParts.push({ text: `RESUME TEXT CONTENT:\n${fileContent}` });
+  } else {
+    initialParts.push({ inlineData: { mimeType, data: fileContent } });
+  }
+
+  // Start the chat
+  const chat = model.startChat({
+    history: [
+      {
+        role: "user",
+        parts: initialParts
+      },
+      {
+        role: "model",
+        parts: [{ text: "Understood. I have read the resume. Ask me anything about this candidate." }]
+      }
+    ]
+  });
+
+  return chat;
+};
