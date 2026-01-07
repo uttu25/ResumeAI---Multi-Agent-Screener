@@ -1,19 +1,18 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AnalysisResult } from "../types";
 
-// 1. Define the Schema to match YOUR Prompt's output requirements
 const RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
     candidateName: { type: Type.STRING, description: "Full name of the candidate." },
-    matchStatus: { type: Type.BOOLEAN, description: "Final Decision: TRUE only if Education AND Mandatory Skills are met. FALSE otherwise." },
-    matchScore: { type: Type.INTEGER, description: "0-100 score. 0=Reject. 70+=Match. Higher score = more non-mandatory skills." },
-    reason: { type: Type.STRING, description: "Explanation of the decision. If rejected, state EXACTLY what is missing." },
-    educationMatch: { type: Type.STRING, description: "The exact text from the resume proving the degree (e.g. 'MBA - Harvard')." },
-    nonMandatorySkillsCount: { type: Type.INTEGER, description: "Count of how many 'Good to Have' skills were found." },
+    matchStatus: { type: Type.BOOLEAN, description: "TRUE if the candidate meets the Minimum Mandatory Requirements (Degree + Critical Skills)." },
+    matchScore: { type: Type.INTEGER, description: "0-100 score. Base score is 70 if mandatory met. Add points for optional skills." },
+    reason: { type: Type.STRING, description: "Explain WHY. If rejected, specify missing degree/skill. If accepted, mention bonus skills found." },
+    educationMatch: { type: Type.STRING, description: "Exact text of the degree found in the resume. If not found, return 'None'." },
+    nonMandatorySkillsCount: { type: Type.INTEGER, description: "Total number of 'Good to Have' skills found in the resume." },
     mandatorySkillsFound: { type: Type.ARRAY, items: { type: Type.STRING } },
     mandatorySkillsMissing: { type: Type.ARRAY, items: { type: Type.STRING } },
-    optionalSkillsFound: { type: Type.ARRAY, items: { type: Type.STRING } },
+    optionalSkillsFound: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of 'Good to Have' skills explicitly found." },
     isAiGenerated: { type: Type.BOOLEAN },
     aiGenerationReasoning: { type: Type.STRING },
   },
@@ -44,42 +43,40 @@ export const analyzeResume = async (
     if (!effectiveKey) throw new Error("No API Key provided.");
     
     const ai = new GoogleGenAI({ apiKey: effectiveKey });
-    
-    // RECOMMENDATION: Keep 'gemini-1.5-pro'. 
-    // It is the smartest stable model for "Strict" reasoning. 
-    // 'Flash' models might skip your detailed instructions for speed.
     const modelId = "gemini-1.5-pro"; 
 
-    // YOUR CUSTOM PROMPT (Slightly optimized for single-file processing)
     const prompt = `
-      You are a Strict Recruitment Screener. You have to go through this resume and check it against the Job Description (JD).
-      
+      You are a Smart Recruitment Screener. Your goal is to be FAIR and DETAILED based on the Job Description (JD).
+
       ### JOB DESCRIPTION (JD):
       ${jobDescription}
-      
-      ### INSTRUCTIONS:
-      1. **Extract Education Requirements**: Does the JD require a specific degree (e.g., "MBA", "Bachelor's", "Master's")?
-      2. **Scan Resume for Education**: Look for these degrees in the 'Education' section of the resume. 
-         - NOTE: "MBA", "M.B.A.", "Master of Business Administration", "PGDM" are all synonyms. B.Tech, B.E. are also synonyms.
-      3. **Scan for Skills**: Look for mandatory technical skills and soft skills.
-      
-      ### CRITICAL DECISION RULES:
-      - **STRICT MATCH**: If JD asks for a degree AND mandatory skills (Tech/Non-Tech/Soft) with phrases like "must have", "should have", and the resume HAS them -> matchStatus: true.
-      
-      - **REJECT (Degree)**: If the JD asks for a degree and the resume does NOT have it -> REJECT (matchStatus: false).
-      
-      - **REJECT (Skills)**: If the JD has mandatory Tech, Non-Tech, or Soft skill requirements and the resume does NOT have them -> REJECT (matchStatus: false).
-      
-      - **RANKING (Non-Mandatory)**: If the JD mentions "good to have" (non-mandatory) skills:
-         - Do NOT reject if these are missing.
-         - **SCORING**: Give a higher 'matchScore' (e.g., 85-100) to candidates who have more of these non-mandatory skills.
-         - Count exactly how many non-mandatory skills they have.
-      
-      ### OUTPUT:
-      Return a JSON object matching the schema. 
-      - In 'educationMatch', paste the exact text from the resume that proves they have the degree (e.g., "MBA - Harvard University").
-      - In 'matchStatus', set true ONLY if education and critical skills are met.
-      - In 'nonMandatorySkillsCount', return the integer number of non-mandatory skills found.
+
+      ### ANALYSIS STEPS:
+
+      **STEP 1: Analyze the JD Requirements**
+      - **Degree:** Does the JD ask for a specific degree? (e.g., "MBA").
+      - **Mandatory Skills:** Does the JD explicitly say "Must have" or "Required"? (If JD is only 1 line like "Must have MBA", then Mandatory Skills = Empty).
+      - **Optional/Bonus Skills:** Does the JD say "Good to have", "Preferred", "Plus", or list skills that aren't strictly mandatory?
+
+      **STEP 2: Scan Resume (Evidence Gathering)**
+      - **Education:** Look for the requested degree (synonyms allowed: MBA==PGDM, B.Tech==B.E.).
+      - **Mandatory Skills:** Check if the candidate has the "Must Haves".
+      - **Optional Skills:** Check if the candidate has the "Good to Haves".
+
+      **STEP 3: Scoring & Decision Logic**
+      - **Pass/Fail Rule (matchStatus):** - Candidate FAILS if they miss the Degree OR any Critical Mandatory Skill.
+         - Candidate PASSES if they have the Degree AND most Mandatory Skills.
+         - *Special Case:* If JD has NO mandatory skills (only Degree), then Degree = Pass.
+
+      - **Scoring Rule (matchScore):**
+         - **Base Score:** 70 points for meeting Mandatory requirements.
+         - **Bonus Points:** Add 5 points for every "Optional Skill" found (up to 100 max).
+         - *Example:* A candidate with MBA + 3 Bonus Skills gets higher score than candidate with just MBA.
+
+      ### OUTPUT INSTRUCTIONS:
+      - 'nonMandatorySkillsCount': Put the exact count of optional skills found.
+      - 'optionalSkillsFound': List them specifically.
+      - 'educationMatch': Put the exact degree string found.
     `;
 
     // Retry Logic
@@ -101,8 +98,6 @@ export const analyzeResume = async (
           config: {
             responseMimeType: "application/json",
             responseSchema: RESPONSE_SCHEMA,
-            // Low temperature = High Strictness. 
-            // We want the AI to be "Strict" as per your instruction.
             temperature: 0.0, 
           }
         });
@@ -123,12 +118,11 @@ export const analyzeResume = async (
 
   } catch (error: any) {
     console.error("Gemini Analysis Error:", error.message);
-    // Fallback error object
     return {
-      candidateName: "Error",
+      candidateName: "Error Processing",
       matchStatus: false,
       matchScore: 0,
-      reason: "Error processing file.",
+      reason: "System Error during analysis.",
       educationMatch: "None",
       nonMandatorySkillsCount: 0,
       mandatorySkillsFound: [],
@@ -140,7 +134,6 @@ export const analyzeResume = async (
   }
 };
 
-// ... (Chat Feature remains unchanged) ...
 export const startChatWithResume = async (
   fileContent: string,
   mimeType: string,
@@ -149,20 +142,14 @@ export const startChatWithResume = async (
 ) => {
   const effectiveKey = apiKey || process.env.API_KEY;
   if (!effectiveKey) throw new Error("No API Key provided.");
-
   const ai = new GoogleGenAI({ apiKey: effectiveKey });
   const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-  const initialParts: any[] = [
-    { text: "You are a Recruitment Assistant. Answer questions based ONLY on the resume provided." }
-  ];
-
+  const initialParts: any[] = [{ text: "You are a Recruitment Assistant. Answer based ONLY on the resume provided." }];
   if (isPlainText) {
     initialParts.push({ text: `RESUME TEXT CONTENT:\n${fileContent}` });
   } else {
     initialParts.push({ inlineData: { mimeType, data: fileContent } });
   }
-
   return model.startChat({
     history: [
       { role: "user", parts: initialParts },
