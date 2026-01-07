@@ -5,14 +5,14 @@ const RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
     candidateName: { type: Type.STRING, description: "Full name of the candidate." },
-    matchStatus: { type: Type.BOOLEAN, description: "TRUE if the candidate meets the Minimum Mandatory Requirements (Degree + Critical Skills)." },
-    matchScore: { type: Type.INTEGER, description: "0-100 score. Base score is 70 if mandatory met. Add points for optional skills." },
-    reason: { type: Type.STRING, description: "Explain WHY. If rejected, specify missing degree/skill. If accepted, mention bonus skills found." },
-    educationMatch: { type: Type.STRING, description: "Exact text of the degree found in the resume. If not found, return 'None'." },
-    nonMandatorySkillsCount: { type: Type.INTEGER, description: "Total number of 'Good to Have' skills found in the resume." },
+    matchStatus: { type: Type.BOOLEAN, description: "TRUE if candidate meets Degree AND All Mandatory Skills. FALSE otherwise." },
+    matchScore: { type: Type.INTEGER, description: "0-100 score. Base 70 for passing. +5 for each bonus skill." },
+    reason: { type: Type.STRING, description: "Clear explanation. If rejected, state missing Degree or Skill. If passed, list bonus skills." },
+    educationMatch: { type: Type.STRING, description: "Exact degree found in resume (e.g. 'B.Tech CS'). If missing, return 'None'." },
+    nonMandatorySkillsCount: { type: Type.INTEGER, description: "Count of optional/bonus skills found." },
     mandatorySkillsFound: { type: Type.ARRAY, items: { type: Type.STRING } },
     mandatorySkillsMissing: { type: Type.ARRAY, items: { type: Type.STRING } },
-    optionalSkillsFound: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of 'Good to Have' skills explicitly found." },
+    optionalSkillsFound: { type: Type.ARRAY, items: { type: Type.STRING } },
     isAiGenerated: { type: Type.BOOLEAN },
     aiGenerationReasoning: { type: Type.STRING },
   },
@@ -45,38 +45,34 @@ export const analyzeResume = async (
     const ai = new GoogleGenAI({ apiKey: effectiveKey });
     const modelId = "gemini-1.5-pro"; 
 
+    // STRICT RECRUITER PROMPT
     const prompt = `
-      You are a Smart Recruitment Screener. Your goal is to be FAIR and DETAILED based on the Job Description (JD).
+      You are a Strict Recruitment Screener. Follow this process EXACTLY.
 
       ### JOB DESCRIPTION (JD):
       ${jobDescription}
 
-      ### ANALYSIS STEPS:
+      ### STEP 1: EDUCATION CHECK (Strict)
+      - Does the JD ask for a specific degree? (e.g., "MBA", "B.Tech", "Master's").
+      - **Action:** Scan resume for this degree (Synonyms: MBA=PGDM, B.Tech=B.E.).
+      - **Rule:** If JD requires a degree and Resume does NOT have it -> **REJECT IMMEDIATELY (matchStatus: false)**.
 
-      **STEP 1: Analyze the JD Requirements**
-      - **Degree:** Does the JD ask for a specific degree? (e.g., "MBA").
-      - **Mandatory Skills:** Does the JD explicitly say "Must have" or "Required"? (If JD is only 1 line like "Must have MBA", then Mandatory Skills = Empty).
-      - **Optional/Bonus Skills:** Does the JD say "Good to have", "Preferred", "Plus", or list skills that aren't strictly mandatory?
+      ### STEP 2: MANDATORY SKILLS CHECK (Strict)
+      - Does the JD explicitly list "Must Have" or "Required" skills?
+      - **Action:** Scan resume for these specific skills.
+      - **Rule:** If the resume is missing ANY critical mandatory skill -> **REJECT IMMEDIATELY (matchStatus: false)**.
+      - *Note:* If JD is short (e.g. "Must have MBA") and lists NO specific skills, then skip this step (Don't invent skills).
 
-      **STEP 2: Scan Resume (Evidence Gathering)**
-      - **Education:** Look for the requested degree (synonyms allowed: MBA==PGDM, B.Tech==B.E.).
-      - **Mandatory Skills:** Check if the candidate has the "Must Haves".
-      - **Optional Skills:** Check if the candidate has the "Good to Haves".
-
-      **STEP 3: Scoring & Decision Logic**
-      - **Pass/Fail Rule (matchStatus):** - Candidate FAILS if they miss the Degree OR any Critical Mandatory Skill.
-         - Candidate PASSES if they have the Degree AND All Mandatory Skills.
-         - *Special Case:* If JD has NO mandatory skills (only Degree), then Degree = Pass.
-
-      - **Scoring Rule (matchScore):**
-         - **Base Score:** 70 points for meeting All Mandatory requirements.
-         - **Bonus Points:** Add 5 points for every "Optional Skill" found (up to 100 max).
-         - *Example:* A candidate with MBA + 3 Bonus Skills gets higher score than candidate with just MBA.
+      ### STEP 3: BONUS / RANKING (Only if Steps 1 & 2 Pass)
+      - Does the JD list "Good to have", "Preferred", or "Bonus" skills?
+      - **Action:** Count how many of these are present.
+      - **Scoring:** - Start with **70** points (Passing Grade).
+         - Add **+5 points** for every Bonus Skill found.
+         - Cap score at 100.
 
       ### OUTPUT INSTRUCTIONS:
-      - 'nonMandatorySkillsCount': Put the exact count of optional skills found.
-      - 'optionalSkillsFound': List them specifically.
-      - 'educationMatch': Put the exact degree string found.
+      - **matchStatus:** TRUE only if Step 1 AND Step 2 are passed.
+      - **reason:** If rejected, say "Rejected: Missing Degree X" or "Rejected: Missing Mandatory Skill Y".
     `;
 
     // Retry Logic
@@ -98,7 +94,7 @@ export const analyzeResume = async (
           config: {
             responseMimeType: "application/json",
             responseSchema: RESPONSE_SCHEMA,
-            temperature: 0.0, 
+            temperature: 0.0, // Strict, factual mode
           }
         });
       } catch (error: any) {
